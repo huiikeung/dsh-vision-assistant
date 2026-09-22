@@ -45,7 +45,7 @@ dsh plugin --profile web add -w dsh-vision-assistant@link:/vol1/1000/Deepseek-Ha
 
 ### 2.3 ⚠️ 必须与 `dsh-vision-opencode` 二选一
 
-两者注册**同一个 settings namespace**（`vision-opencode`，刻意沿用以零迁移继承你的旧配置）、**同一个工具名**与**同一个 skill**，同时启用会撞名。切换方式是在 profile 的 `cordis.patch.yml` 里停用旧的：
+本插件使用自己的 settings namespace `vision-assistant`（首次启动会把旧 `vision-opencode` 命名空间下的配置一次性迁移过来），但 `vision_read_image` 工具与 `vision-image-analysis` skill 与旧插件同名，同时启用会撞名。切换方式是在 profile 的 `cordis.patch.yml` 里停用旧的：
 
 ```yaml
 - id: vision-opencode

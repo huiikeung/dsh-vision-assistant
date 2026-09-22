@@ -1,9 +1,9 @@
 {
   "name": "dsh-vision-assistant",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "main": "lib/index.js",
-  "description": "DeepSeek Harness plugin (集成版): 设置侧栏「视觉助手」——上半区管理已配置的视觉模型（只显示声明支持图片的模型），下半区管理免费视觉渠道（免 Key OVHcloud 兜底 + 渠道级密钥 + 多 key 轮换 + 免费链路自动降级）。以 dsh-vision-opencode 为底座，整合 dsh-vision-router 与 ModLens 的能力。",
+  "description": "DeepSeek Harness plugin (集成版): 设置侧栏「视觉助手」——上半区管理已配置的视觉模型（只显示声明支持图片的模型），下半区管理免费视觉渠道（免 Key OVHcloud 兜底 + 渠道级密钥 + 多 key 轮换 + 免费链路自动降级）。整合 dsh-vision-router 与 ModLens 的能力。",
   "license": "MIT",
   "engines": {
     "node": ">=20.3"
