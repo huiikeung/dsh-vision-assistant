@@ -258,10 +258,7 @@ async function bootPair({ settingsDoc = {}, credentials = {}, providers = [], mo
 async function expandSummary(runtime, sections, tree, title) {
   const candidates = findAll(tree, (n) => n.type === 'button'
     && String(n.props?.className ?? '').includes('vmo-free-summary'));
-  const summary = candidates.find((n) => {
-    const text = textOf(n);
-    return text.includes(title) && !text.includes('免费视觉模型');
-  }) ?? candidates.find((n) => textOf(n).includes(title) && !(title !== '免费视觉模型' && textOf(n).includes('免费视觉模型')));
+  const summary = candidates.find((n) => textOf(n).includes(title));
   if (summary === undefined) throw new Error(`找不到折叠头：${title}`);
   if (summary.props['aria-expanded'] === true) return tree;
   summary.props.onClick();
@@ -270,12 +267,12 @@ async function expandSummary(runtime, sections, tree, title) {
 
 /** 免费模块默认折叠：点击摘要头展开后返回新树（已展开则原样返回）。 */
 async function expandFree(runtime, sections, tree) {
-  return expandSummary(runtime, sections, tree, '免费视觉模型');
+  return expandSummary(runtime, sections, tree, '免费模型兜底链路');
 }
 
 /** 「免费模型」分组框默认折叠：点击分组头展开渠道卡（已展开则原样返回）。 */
 async function expandGroup(runtime, sections, tree) {
-  return expandSummary(runtime, sections, tree, '免费模型配置');
+  return expandSummary(runtime, sections, tree, '免费渠道');
 }
 
 /**
@@ -343,24 +340,21 @@ test('设置页渲染：上半区模型列表 + 下半区免费视觉模型模�
     text = textOf(tree);
     assert.ok(text.includes('Nex N2.5 Pro'), '展开后应渲染已配置的识图模型');
     // 下半区：免费视觉模型模块
-    assert.ok(text.includes('免费视觉模型'), '应渲染免费视觉模型模块标题');
+    assert.ok(text.includes('免费模型兜底链路'), '应渲染免费链路模块标题');
     assert.ok(text.includes('免费链路（自动降级）'), '应渲染免费链路开关');
     assert.ok(text.includes('结构化证据模式'), '应渲染结构化证据开关');
-    assert.ok(text.includes('OVHcloud'), '应渲染内置免 Key 渠道');
-    assert.ok(text.includes('OVHcloud AI Endpoints（免 Key 匿名）'), '渠道名来自预设');
-    assert.ok(text.includes('密钥引用') || text.includes('免 Key 渠道'), '应交代密钥引用方式');
     assert.ok(text.includes('OpenRouter 免费视觉模型'), '应渲染 OpenRouter 渠道');
-    // 免 Key 渠道不提供「配置密钥」按钮
-    const ovhCard = channelCard(tree, 'OVHcloud AI Endpoints（免 Key 匿名）');
-    const ovhButtons = findAll(ovhCard, (n) => n.type === 'button').map((n) => textOf(n));
-    assert.equal(ovhButtons.some((t) => t.trim() === '密钥'), false, '免 Key 渠道不应出现密钥按钮');
-    assert.ok(ovhButtons.some((t) => t.includes('测试')), '每个渠道都应有测试按钮');
+    // 免 Key 渠道属于第三层模块，不出现在第二层渠道列表里
+    assert.equal(text.includes('OVHcloud'), false, '免 Key 渠道不应出现在免费链路模块');
     const orCard = channelCard(tree, 'OpenRouter 免费视觉模型');
     const orButtons = findAll(orCard, (n) => n.type === 'button').map((n) => textOf(n));
     assert.ok(orButtons.some((t) => t.trim() === '密钥'), '需密钥的渠道应有密钥按钮');
     assert.ok(orButtons.some((t) => t.includes('探测模型')), '应有探测按钮');
-    // 免费链路预览应如实列出兜底的 OVH 模型
-    assert.ok(text.includes('Qwen2.5-VL-72B-Instruct'), '链路预览应包含免 Key 兜底模型');
+    // 第三层：免 Key 最终兜底模块（独立 section，开关 + 兜底模型清单）
+    tree = await expandSummary(runtime, sections, tree, '免 Key 最终兜底');
+    text = textOf(tree);
+    assert.ok(text.includes('启用免 Key 最终兜底'), '应渲染免 Key 兜底开关');
+    assert.ok(text.includes('Qwen2.5-VL-72B-Instruct'), '免 Key 兜底模块应列出 OVH 兜底模型');
   } finally {
     globalThis.fetch = previousFetch;
     runtime.dispose();
@@ -392,16 +386,16 @@ test('免费渠道交互：加入链路 / 配置密钥（写凭据服务）都�
     assert.ok(chainStep, '手动链路项应可拖拽排序');
 
     // ①b 模型 chip：本体是加入/移出链路的开关，且带独立删除按钮。
-    // 用 OVH 的一个未入链模型验证「点击 → 追加到链路顺序表尾」。
-    const chipCard = channelCard(tree, 'OVHcloud AI Endpoints（免 Key 匿名）');
+    // 用 DashScope 的一个未入链模型验证「点击 → 追加到链路顺序表尾」。
+    const chipCard = channelCard(tree, '阿里云百炼 DashScope（Qwen-VL）');
     const chipToggle = findAll(chipCard, (n) => n.type === 'button' && String(n.props?.className ?? '').includes('vmo-free-chip-toggle'))[0];
     assert.ok(chipToggle, '模型 chip 应有加入/移出开关');
     assert.ok(findAll(chipCard, (n) => n.type === 'button' && String(n.props?.['aria-label'] ?? '').startsWith('删除')).length > 0, '模型 chip 应有删除按钮');
     chipToggle.props.onClick();
     tree = await runtime.settle(component, { injected: { api } });
     const orderAfterChip = host.settings.document().freeChainOrder;
-    assert.ok(orderAfterChip.includes('ch:ovh:Qwen2.5-VL-72B-Instruct'), '点击 chip 应把模型追加进链路顺序表');
-    assert.equal(orderAfterChip.at(-1), 'ch:ovh:Qwen2.5-VL-72B-Instruct', '新加入的排在末尾');
+    assert.ok(orderAfterChip.includes('ch:dashscope:qwen3-vl-plus'), '点击 chip 应把模型追加进链路顺序表');
+    assert.equal(orderAfterChip.at(-1), 'ch:dashscope:qwen3-vl-plus', '新加入的排在末尾');
     assert.ok(chainStep, '手动链路项应可拖拽排序');
 
     // ② 配置密钥：打开表单 → 输入 → 保存到 DSH 凭据服务（ref = 渠道 keyRef）
@@ -423,7 +417,7 @@ test('免费渠道交互：加入链路 / 配置密钥（写凭据服务）都�
     assert.equal(JSON.stringify(host.settings.document()).includes('sk-a'), false);
 
     // ③ 测试按钮：打到后端 /free-channels 之外的 free-test 路由（渠道不可达时应如实提示）
-    const card3 = channelCard(tree, 'OVHcloud AI Endpoints（免 Key 匿名）');
+    const card3 = channelCard(tree, '硅基流动 SiliconFlow');
     const testButton = findAll(card3, (n) => n.type === 'button' && textOf(n) === '测试')[0];
     assert.ok(testButton, '应有测试按钮');
   } finally {
@@ -439,13 +433,17 @@ test('半区结构：免费模块固定渲染在模型列表之后（上/下两�
   try {
     const tree = await runtime.settle(sections.get('vision').component, sections.get('vision').options.inject());
     const text = textOf(tree);
-    const freeAt = text.indexOf('免费视觉模型');
+    const freeAt = text.indexOf('免费模型兜底链路');
+    const keylessAt = text.indexOf('免 Key 最终兜底');
     const addAt = text.indexOf('添加');
-    assert.ok(freeAt > 0, '应渲染免费视觉模型模块');
+    assert.ok(freeAt > 0, '应渲染免费链路模块');
+    assert.ok(keylessAt > freeAt, '免 Key 兜底模块应排在免费链路之后');
     assert.ok(freeAt > addAt, '免费模块应排在模型列表/添加区块之后（即页面下方）');
     // 区块自身带 aria-label，便于无障碍与测试定位
-    const blocks = findAll(tree, (n) => n.props?.['aria-label'] === '免费视觉模型');
-    assert.equal(blocks.length, 1, '免费模块应是单一 section');
+    const blocks = findAll(tree, (n) => n.props?.['aria-label'] === '免费模型兜底链路');
+    const keylessBlocks = findAll(tree, (n) => n.props?.['aria-label'] === '免 Key 最终兜底');
+    assert.equal(blocks.length, 1, '免费链路模块应是单一 section');
+    assert.equal(keylessBlocks.length, 1, '免 Key 兜底模块应是单一 section');
   } finally {
     globalThis.fetch = previousFetch;
     runtime.dispose();
@@ -617,8 +615,7 @@ test('渠道状态圆点来自宿主凭据服务（remote.describe）', async ()
     assert.match(zhipuDot.props.title, /已配置密钥/);
     const dashscopeDot = findAll(channelCard(tree, '阿里云百炼 DashScope（Qwen-VL）'), (n) => String(n.props?.className ?? '').includes('credentialDot'))[0];
     assert.match(dashscopeDot.props.title, /未配置密钥/);
-    const ovhDot = findAll(channelCard(tree, 'OVHcloud AI Endpoints（免 Key 匿名）'), (n) => String(n.props?.className ?? '').includes('credentialDot'))[0];
-    assert.match(ovhDot.props.title, /免 Key/);
+    // 免 Key 渠道已移入第三层「免 Key 最终兜底」模块，第二层不再渲染其渠道卡
   } finally {
     globalThis.fetch = previousFetch;
     runtime.dispose();
@@ -655,7 +652,7 @@ test('图片传递方式条紧贴「免费视觉模型」模块上方', async ()
     const children = tree.props.children.filter((n) => n !== null);
     const addIdx = children.findIndex((n) => textOf(n).includes('添加提供方'));
     const deliveryIdx = children.findIndex((n) => textOf(n).includes('图片传递方式'));
-    const freeIdx = children.findIndex((n) => n.props?.['aria-label'] === '免费视觉模型');
+    const freeIdx = children.findIndex((n) => n.props?.['aria-label'] === '免费模型兜底链路');
     assert.ok(addIdx >= 0 && deliveryIdx >= 0 && freeIdx >= 0);
     assert.ok(deliveryIdx > addIdx && deliveryIdx < freeIdx, '传递方式条应在模型列表之后、免费模块之前');
   } finally {
@@ -678,7 +675,7 @@ test('免费模块默认折叠：点击头部才展开（总开关与渠道卡�
     assert.ok(summary, '应有可点击的摘要头');
     assert.equal(summary.props['aria-expanded'], false, '默认必须折叠');
     let text = textOf(tree);
-    assert.ok(text.includes('免费视觉模型'), '折叠态也保留模块标题');
+    assert.ok(text.includes('免费模型兜底链路'), '折叠态也保留模块标题');
     assert.match(text, /个渠道/, '折叠态显示渠道数摘要');
     assert.equal(/加入链路/.test(text), false, '折叠态不应渲染「加入链路」');
     assert.equal(/免费链路（自动降级）/.test(text), false, '折叠态不应渲染总开关');
@@ -687,31 +684,32 @@ test('免费模块默认折叠：点击头部才展开（总开关与渠道卡�
     // 展开模块：总开关成卡片框、链路顺序标签独占一行、渠道收在「免费模型」分组框里
     tree = await expandFree(runtime, sections, tree);
     text = textOf(tree);
-    for (const marker of ['免费链路（自动降级）', '免 Key 渠道兜底', '结构化证据模式', '免费链路顺序']) {
+    for (const marker of ['免费链路（自动降级）', '结构化证据模式', '免费链路顺序']) {
       assert.ok(text.includes(marker), `展开后应包含：${marker}`);
     }
-    const freeSection = findAll(tree, (n) => n.props?.['aria-label'] === '免费视觉模型')[0];
+    const freeSection = findAll(tree, (n) => n.props?.['aria-label'] === '免费模型兜底链路')[0];
     const toggleCards = findAll(freeSection, (n) => String(n.props?.className ?? '').includes('vmo-free-toggleCard'));
-    assert.equal(toggleCards.length, 3, '三个总开关应各自框在边框卡片里');
+    assert.equal(toggleCards.length, 2, '免费链路模块的两个总开关应各自框在边框卡片里（免 Key 开关在第三层模块）');
     // 分组框默认仍是折叠的：渠道卡不可见，只有分组头
     assert.equal(/全部加入/.test(text), false, '分组框折叠时不应渲染渠道卡');
     const groupHead = findAll(tree, (n) => n.type === 'button'
       && String(n.props?.className ?? '').includes('vmo-free-summary')
-      && textOf(n).includes('免费模型配置') && !textOf(n).includes('免费视觉模型'))[0];
-    assert.ok(groupHead, '应有「免费模型」分组头');
+      && textOf(n).includes('免费渠道'))[0];
+    assert.ok(groupHead, '应有「免费渠道」分组头');
     assert.equal(groupHead.props['aria-expanded'], false, '分组框默认折叠');
     assert.match(textOf(groupHead), /个渠道/);
 
     // 展开分组框：渠道卡出现
     tree = await expandGroup(runtime, sections, tree);
     text = textOf(tree);
-    for (const marker of ['OVHcloud AI Endpoints', '全部加入']) {
+    for (const marker of ['OpenRouter 免费视觉模型', '全部加入']) {
       assert.ok(text.includes(marker), `展开分组后应包含：${marker}`);
     }
+    assert.equal(text.includes('OVHcloud'), false, '免 Key 渠道不应装在第二层分组框里');
     // 分组框是一个框：分组头与渠道卡同在 vmo-free-group 容器内
     const group = findAll(tree, (n) => String(n.props?.className ?? '') === 'vmo-free-group')[0];
     assert.ok(group, '应有 vmo-free-group 分组框');
-    assert.ok(textOf(group).includes('OVHcloud AI Endpoints'), '渠道卡应装在分组框里');
+    assert.ok(textOf(group).includes('OpenRouter 免费视觉模型'), '渠道卡应装在分组框里');
   } finally {
     globalThis.fetch = previousFetch;
     runtime.dispose();
