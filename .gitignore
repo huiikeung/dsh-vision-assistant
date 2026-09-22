@@ -1,0 +1,14 @@
+# dependencies (symlinks into the DSH profile — install with `pnpm install`)
+node_modules/
+
+# build output is committed (lib/) so the plugin installs without a build step
+
+# logs & OS noise
+*.log
+.DS_Store
+
+# backups / scratch
+*.bak
+*.orig
+*.tmp
+/.tmp/

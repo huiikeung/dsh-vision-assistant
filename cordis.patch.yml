@@ -1,0 +1,16 @@
+# dsh-vision-assistant bundle patch
+#
+# 通过官方 CLI 安装（link 本地目录）：
+#   dsh plugin --profile web add -w dsh-vision-assistant@link:/vol1/1000/Deepseek-Harness/工作台/插件/dsh-vision-assistant
+#
+# 安装后本行会把宿主半边（lib/index.js）挂进 profile；浏览器半边
+# （lib/client.js）由 package.json 的 `dsh.client` 声明被 client-modules 扫描。
+#
+# ⚠️ 与 dsh-vision-opencode 互斥：两者注册同一个 settings namespace
+# （vision-opencode）、同一个工具名（vision_read_image）与同一个 skill，
+# 不能同时启用。切换时在 profile 的 cordis.patch.yml 里保留一行 disabled：
+#   - id: vision-opencode
+#     disabled: true
+- insert:
+    - id: vision-assistant
+      name: 'dsh-vision-assistant'
